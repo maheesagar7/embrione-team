@@ -31,7 +31,12 @@ h1 { font-size: 2.2rem; }
 .btn { background: #8b5cf6; border: 0; border-radius: 10px; padding: 12px; font-weight: 600; cursor: pointer; }
 .btn:hover { background: #7c3aed; }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
-.avatar.placeholder { display: flex; align-items: center; justify-content: center; }
+.avatar.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #7c3aed, #0ea5e9);
+  flex-shrink: 0;
+}
+.avatar .initial { font-size: 1.6rem; font-weight: 700; color: #fff; }
 .stats { display: grid; gap: 16px; margin-top: 24px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .stats h2 { font-size: 2rem; margin-top: 6px; }
 .actions { display: flex; gap: 8px; margin-top: 16px; }
