@@ -32,3 +32,10 @@ h1 { font-size: 2.2rem; }
 .btn:hover { background: #7c3aed; }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
 .avatar.placeholder { display: flex; align-items: center; justify-content: center; }
+.stats { display: grid; gap: 16px; margin-top: 24px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.stats h2 { font-size: 2rem; margin-top: 6px; }
+.actions { display: flex; gap: 8px; margin-top: 16px; }
+.actions .btn { flex: 1; padding: 8px; font-size: .85rem; }
+.btn.approve { background: #16a34a; }
+.btn.reject { background: #dc2626; }
+.btn.del { background: #3f3f46; }

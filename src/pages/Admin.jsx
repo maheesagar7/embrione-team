@@ -1,104 +1,123 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
+import { supabase } from '../lib/supabase'
+
+const ADMIN_EMAIL = 'admin@embrione.pes.edu'
+const ADMIN_PASSWORD = 'EmbrioneAdmin@2026'
 
 export default function Admin() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [pendingMembers, setPendingMembers] = useState([]);
-  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0 });
+  const [authed, setAuthed] = useState(sessionStorage.getItem('admin') === '1')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [members, setMembers] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (email === 'admin@embrione.pes.edu' && password === 'EmbrioneAdmin@2026') {
-      setIsLoggedIn(true);
-      fetchData();
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('members').select('*').order('created_at', { ascending: false })
+    if (error) toast.error(error.message)
+    setMembers(data || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { if (authed) load() }, [authed, load])
+
+  function login(e) {
+    e.preventDefault()
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      sessionStorage.setItem('admin', '1')
+      setAuthed(true)
+      toast.success('Welcome, admin')
     } else {
-      alert('Invalid universal admin credentials!');
+      toast.error('Invalid credentials')
     }
-  };
-
-  const fetchData = async () => {
-    const { data } = await supabase.from('members').select('*');
-    if (data) {
-      setPendingMembers(data.filter((m) => m.status === 'pending'));
-      setStats({
-        total: data.length,
-        pending: data.filter((m) => m.status === 'pending').length,
-        approved: data.filter((m) => m.status === 'approved').length,
-      });
-    }
-  };
-
-  const updateStatus = async (id, status) => {
-    await supabase.from('members').update({ status }).eq('id', id);
-    fetchData();
-  };
-
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4">
-        <form onSubmit={handleLogin} className="bg-neutral-900 border border-neutral-800 p-8 rounded-2xl w-full max-w-md space-y-4">
-          <h1 className="text-xl font-bold text-white mb-2">Admin Portal Login</h1>
-          <div>
-            <label className="block text-xs uppercase text-neutral-400 mb-1">Admin Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-          </div>
-          <div>
-            <label className="block text-xs uppercase text-neutral-400 mb-1">Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-          </div>
-          <button type="submit" className="w-full py-3 bg-purple-600 font-semibold rounded hover:bg-purple-500 transition">Login</button>
-        </form>
-      </div>
-    );
   }
 
-  return (
-    <div className="min-h-screen bg-neutral-950 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-purple-400">Admin Moderation Dashboard</h1>
-        
-        {/* Counters */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl">
-            <div className="text-neutral-400 text-sm">Total Submissions</div>
-            <div className="text-3xl font-bold text-white mt-1">{stats.total}</div>
-          </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl">
-            <div className="text-neutral-400 text-sm">Pending Review</div>
-            <div className="text-3xl font-bold text-amber-400 mt-1">{stats.pending}</div>
-          </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl">
-            <div className="text-neutral-400 text-sm">Approved</div>
-            <div className="text-3xl font-bold text-emerald-400 mt-1">{stats.approved}</div>
-          </div>
-        </div>
+  function logout() {
+    sessionStorage.removeItem('admin')
+    setAuthed(false)
+  }
 
-        <h2 className="text-xl font-semibold mb-4">Pending Profiles</h2>
-        <div className="space-y-4">
-          {pendingMembers.length === 0 ? (
-            <p className="text-neutral-500">No pending profiles to review.</p>
-          ) : (
-            pendingMembers.map((member) => (
-              <div key={member.id} className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <img src={member.photo_url} alt="" className="w-14 h-14 rounded-full object-cover border border-purple-500" />
-                  <div>
-                    <h3 className="font-bold text-lg">{member.name}</h3>
-                    <p className="text-sm text-purple-400">{member.domain} • {member.position}</p>
-                    <p className="text-xs text-neutral-400 mt-1">{member.bio}</p>
-                  </div>
-                </div>
-                <div className="flex space-x-3">
-                  <button onClick={() => updateStatus(member.id, 'approved')} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold rounded">Approve</button>
-                  <button onClick={() => updateStatus(member.id, 'rejected')} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-sm font-semibold rounded">Reject</button>
-                </div>
-              </div>
-            ))
-          )}
+  async function setStatus(id, status) {
+    const { error } = await supabase.from('members').update({ status }).eq('id', id)
+    if (error) return toast.error(error.message)
+    toast.success(status === 'approved' ? 'Approved' : 'Rejected')
+    load()
+  }
+
+  async function remove(id) {
+    if (!confirm('Delete this profile?')) return
+    const { error } = await supabase.from('members').delete().eq('id', id)
+    if (error) return toast.error(error.message)
+    toast.success('Deleted')
+    load()
+  }
+
+  if (!authed) {
+    return (
+      <div className="page">
+        <div className="wrap" style={{ maxWidth: 400 }}>
+          <h1>Admin <span className="accent">Login</span></h1>
+          <form className="form" onSubmit={login} style={{ marginTop: 24 }}>
+            <label>Email
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            <label>Password
+              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+            <button className="btn" type="submit">Log in</button>
+          </form>
         </div>
       </div>
+    )
+  }
+
+  const pending = members.filter((m) => m.status === 'pending')
+  const approved = members.filter((m) => m.status === 'approved')
+
+  return (
+    <div className="page">
+      <div className="wrap">
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h1>Admin <span className="accent">Dashboard</span></h1>
+          <button className="btn" style={{ padding: '8px 16px' }} onClick={logout}>Log out</button>
+        </div>
+
+        <div className="stats">
+          <div className="card"><p className="muted">Total Submissions</p><h2>{members.length}</h2></div>
+          <div className="card"><p className="muted">Pending</p><h2>{pending.length}</h2></div>
+          <div className="card"><p className="muted">Approved</p><h2>{approved.length}</h2></div>
+        </div>
+
+        <h2 style={{ marginTop: 32 }}>Pending approvals</h2>
+        {loading ? (
+          <p className="muted" style={{ marginTop: 16 }}>Loading...</p>
+        ) : pending.length === 0 ? (
+          <p className="muted" style={{ marginTop: 16 }}>No pending profiles.</p>
+        ) : (
+          <div className="grid">
+            {pending.map((m) => (
+              <div key={m.id} className="card">
+                <div className="row">
+                  <img className="avatar" src={m.photo_url} alt={m.name} />
+                  <div style={{ minWidth: 0 }}>
+                    <h2 className="name">{m.name}</h2>
+                    <p className="sub">{m.position} · {m.domain}</p>
+                  </div>
+                </div>
+                <p className="bio">{m.bio}</p>
+                <p className="meta">{m.srn} · {m.branch} · Sem {m.semester}</p>
+                <div className="actions">
+                  <button className="btn approve" onClick={() => setStatus(m.id, 'approved')}>Approve</button>
+                  <button className="btn reject" onClick={() => setStatus(m.id, 'rejected')}>Reject</button>
+                  <button className="btn del" onClick={() => remove(m.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  );
+  )
 }
