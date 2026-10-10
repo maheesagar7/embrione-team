@@ -53,8 +53,8 @@ export default function Team() {
           <p className="muted" style={{ marginTop: 40 }}>No members found.</p>
         ) : (
           <div className="grid">
-            {shown.map((m) => (
-              <div key={m.id} className="card">
+            {shown.map((m, i) => (
+                <div key={m.id} className="card" style={{ animationDelay: `${i * 90}ms` }}>
                 <div className="row">
                   <img className="avatar" src={m.photo_url} alt={m.name} />
                   <div style={{ minWidth: 0 }}>

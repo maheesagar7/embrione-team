@@ -43,3 +43,91 @@ h1 { font-size: 2.2rem; }
 .nav a { color: #a1a1aa; text-decoration: none; font-weight: 500; }
 .nav a:hover { color: #fff; }
 .nav a.active { color: #a78bfa; }
+/* ---------- Page entrance ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.wrap { animation: fadeUp .6s ease both; }
+
+/* ---------- Staggered card entrance ---------- */
+.card { animation: fadeUp .6s ease both; }
+
+/* ---------- Animated gradient heading ---------- */
+@keyframes shine {
+  to { background-position: 200% center; }
+}
+.accent {
+  background: linear-gradient(90deg, #a78bfa, #38bdf8, #f472b6, #a78bfa);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 4s linear infinite;
+}
+
+/* ---------- Floating background glow ---------- */
+@keyframes drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(60px, 40px) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+body::before, body::after {
+  content: "";
+  position: fixed;
+  width: 420px; height: 420px;
+  border-radius: 50%;
+  filter: blur(110px);
+  opacity: .22;
+  z-index: -1;
+  pointer-events: none;
+  animation: drift 14s ease-in-out infinite;
+}
+body::before { background: #7c3aed; top: -120px; left: -100px; }
+body::after  { background: #0ea5e9; bottom: -140px; right: -100px; animation-delay: -7s; }
+
+/* ---------- Card hover: glow + lift ---------- */
+.card { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.card:hover {
+  transform: translateY(-6px);
+  border-color: #8b5cf6;
+  box-shadow: 0 12px 40px -12px rgba(139, 92, 246, .55);
+}
+
+/* ---------- Avatar ring on hover ---------- */
+.avatar { transition: transform .3s ease, box-shadow .3s ease; }
+.card:hover .avatar {
+  transform: scale(1.08) rotate(-3deg);
+  box-shadow: 0 0 0 3px #8b5cf6, 0 0 20px rgba(139, 92, 246, .6);
+}
+
+/* ---------- Buttons ---------- */
+.btn { transition: transform .15s ease, box-shadow .2s ease, background .2s ease; }
+.btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px -8px rgba(139, 92, 246, .8); }
+.btn:active:not(:disabled) { transform: scale(.96); }
+
+/* ---------- Nav underline slide ---------- */
+.nav a { position: relative; padding-bottom: 4px; }
+.nav a::after {
+  content: ""; position: absolute; left: 0; bottom: 0;
+  height: 2px; width: 0; background: #a78bfa;
+  transition: width .25s ease;
+}
+.nav a:hover::after, .nav a.active::after { width: 100%; }
+
+/* ---------- Gentle float on the register preview ---------- */
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+.preview .card { animation: fadeUp .6s ease both, floaty 5s ease-in-out .6s infinite; }
+
+/* ---------- Form focus glow ---------- */
+.form input:focus, .form select:focus, .form textarea:focus {
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, .25);
+}
+
+/* ---------- Respect users who prefer less motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
