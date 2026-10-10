@@ -1,222 +1,219 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { supabase } from '../lib/supabase'
+
+const DOMAINS = ['Web Development', 'Design', 'Logistics', 'Operations', 'Sponsorship', 'Hospitality', 'Social Media', 'Event Management']
+const POSITIONS = ['Head', 'Vice-Head', 'Core Member', 'Member']
+const BRANCHES = ['CSE', 'AIML', 'ECE', 'EEE', 'ME', 'Biotech', 'Civil']
+const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8]
+
+const EMPTY = {
+  name: '', domain: DOMAINS[0], position: POSITIONS[3], srn: '', email: '',
+  linkedin_url: '', github_url: '', branch: BRANCHES[0], semester: 1, bio: '',
+}
+
+// Resize to max 800px wide and convert to WebP in the browser
+function toWebP(file, maxW = 800, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('Conversion failed'))),
+        'image/webp',
+        quality
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image')) }
+    img.src = url
+  })
+}
 
 export default function Register() {
-  const [formData, setFormData] = useState({
-    name: '',
-    domain: 'Web Development',
-    position: 'Member',
-    srn: '',
-    email: '',
-    linkedin_url: '',
-    github_url: '',
-    branch: 'CSE',
-    semester: 1,
-    bio: '',
-  });
+  const [form, setForm] = useState(EMPTY)
+  const [photoBlob, setPhotoBlob] = useState(null)
+  const [preview, setPreview] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  // Local preview from the converted blob (nothing is uploaded yet)
+  useEffect(() => {
+    if (!photoBlob) { setPreview(''); return }
+    const url = URL.createObjectURL(photoBlob)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photoBlob])
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const set = (key) => (e) => {
+    let value = e.target.value
+    if (key === 'srn') value = value.toUpperCase()
+    if (key === 'semester') value = Number(value)
+    setForm((f) => ({ ...f, [key]: value }))
+  }
 
-  const handleImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+  async function onFile(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      toast.error('Please choose a .png, .jpg or .jpeg image')
+      e.target.value = ''
+      return
     }
-  };
-
-  const convertToWebP = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const MAX_WIDTH = 800;
-
-          if (width > MAX_WIDTH) {
-            height = Math.round((height * MAX_WIDTH) / width);
-            width = MAX_WIDTH;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              if (blob) resolve(blob);
-              else reject(new Error('Canvas conversion failed'));
-            },
-            'image/webp',
-            0.8
-          );
-        };
-      };
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-
     try {
-      let photo_url = 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (formData.name || 'default');
+      const blob = await toWebP(file)
+      setPhotoBlob(blob)
+    } catch {
+      toast.error('Could not process that image')
+    }
+  }
 
-      if (imageFile) {
-        const webpBlob = await convertToWebP(imageFile);
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.webp`;
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!photoBlob) return toast.error('Please upload a profile picture')
+    if (form.bio.length < 150 || form.bio.length > 200)
+      return toast.error('Bio must be 150 to 200 characters')
 
-        const { error: uploadError } = await supabase.storage
-          .from('member-photos')
-          .upload(fileName, webpBlob, { contentType: 'image/webp' });
+    setSubmitting(true)
+    try {
+      const srn = form.srn.trim().toUpperCase()
 
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('member-photos')
-          .getPublicUrl(fileName);
-
-        photo_url = publicUrlData.publicUrl;
+      // Duplicate SRN check
+      const { data: existing, error: checkErr } = await supabase
+        .from('members').select('id').eq('srn', srn).limit(1)
+      if (checkErr) throw checkErr
+      if (existing && existing.length > 0) {
+        toast.error('This SRN has already been submitted')
+        return
       }
 
-      const { error } = await supabase.from('members').insert([
-        { ...formData, photo_url, status: 'pending' }
-      ]);
+      // Upload the WebP only now, on submit
+      const path = `${crypto.randomUUID()}.webp`
+      const { error: upErr } = await supabase.storage
+        .from('member-photos')
+        .upload(path, photoBlob, { contentType: 'image/webp' })
+      if (upErr) throw upErr
+      const { data: pub } = supabase.storage.from('member-photos').getPublicUrl(path)
 
-      if (error) throw error;
+      const { error: insErr } = await supabase.from('members').insert({
+        ...form, srn, name: form.name.trim(), photo_url: pub.publicUrl, status: 'pending',
+      })
+      if (insErr) throw insErr
 
-      setMessage('Successfully submitted! Your profile is pending approval.');
-      setFormData({
-        name: '', domain: 'Web Development', position: 'Member',
-        srn: '', email: '', linkedin_url: '', github_url: '',
-        branch: 'CSE', semester: 1, bio: ''
-      });
-      setImageFile(null);
-      setPreviewUrl('');
+      toast.success('Submitted! Your profile is awaiting admin approval.')
+      setForm(EMPTY)
+      setPhotoBlob(null)
+      e.target.reset()
     } catch (err) {
-      setMessage('Error: ' + err.message);
+      console.error(err)
+      toast.error(err.message || 'Something went wrong')
     } finally {
-      setLoading(false);
+      setSubmitting(false)
     }
-  };
+  }
+
+  const bioLen = form.bio.length
+  const bioOk = bioLen >= 150 && bioLen <= 200
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
-      {/* Form Section */}
-      <div className="bg-neutral-900 p-8 rounded-2xl border border-neutral-800">
-        <h1 className="text-2xl font-bold mb-6 text-purple-400">Member Onboarding</h1>
-        {message && (
-          <div className="mb-4 p-3 bg-purple-900/50 border border-purple-500 rounded text-sm">
-            {message}
-          </div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs uppercase text-neutral-400 mb-1">Full Name</label>
-            <input name="name" value={formData.name} onChange={handleInputChange} required className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">Domain</label>
-              <select name="domain" value={formData.domain} onChange={handleInputChange} className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white">
-                {['Web Development', 'Design', 'Logistics', 'Operations', 'Sponsorship', 'Hospitality', 'Social Media', 'Event Management'].map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">Position</label>
-              <select name="position" value={formData.position} onChange={handleInputChange} className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white">
-                {['Head', 'Vice-Head', 'Core Member', 'Member'].map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">SRN</label>
-              <input name="srn" value={formData.srn} onChange={handleInputChange} placeholder="PES1UG23CS001" required className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">Email</label>
-              <input name="email" type="email" value={formData.email} onChange={handleInputChange} required className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">Branch</label>
-              <input name="branch" value={formData.branch} onChange={handleInputChange} required className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">Semester</label>
-              <select name="semester" value={formData.semester} onChange={handleInputChange} className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">LinkedIn URL</label>
-              <input name="linkedin_url" value={formData.linkedin_url} onChange={handleInputChange} className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase text-neutral-400 mb-1">GitHub URL</label>
-              <input name="github_url" value={formData.github_url} onChange={handleInputChange} className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs uppercase text-neutral-400 mb-1">Bio (~150-200 chars)</label>
-            <textarea name="bio" maxLength={200} value={formData.bio} onChange={handleInputChange} className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white" />
-          </div>
-          <div>
-            <label className="block text-xs uppercase text-neutral-400 mb-1">Profile Picture</label>
-            <input type="file" accept="image/*" onChange={handleImageChange} className="w-full text-sm text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-purple-600 file:text-white" />
-          </div>
-          <button type="submit" disabled={loading} className="w-full py-3 bg-purple-600 font-semibold rounded hover:bg-purple-500 transition">
-            {loading ? 'Converting & Submitting...' : 'Submit Profile'}
-          </button>
-        </form>
-      </div>
+    <div className="page">
+      <div className="wrap">
+        <h1>Join The <span className="accent">Team</span></h1>
+        <p className="muted">Fill in your details and watch your card update live.</p>
 
-      {/* Live Preview Section */}
-      <div className="flex flex-col items-center justify-center p-8 bg-neutral-900/40 border border-dashed border-neutral-800 rounded-2xl">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-6">Live Card Preview</h2>
-        <div className="w-80 bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center">
-          <img
-            src={previewUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name || 'placeholder'}`}
-            alt="Preview"
-            className="w-24 h-24 rounded-full object-cover border-2 border-purple-500 mb-4"
-          />
-          <h3 className="text-lg font-bold text-white">{formData.name || 'Your Name'}</h3>
-          <span className="inline-block px-3 py-1 bg-purple-950 text-purple-300 text-xs rounded-full mt-1 mb-3">
-            {formData.domain} • {formData.position}
-          </span>
-          <p className="text-sm text-neutral-400 line-clamp-3 mb-4">
-            {formData.bio || 'Your short description will appear here in real-time as you type...'}
-          </p>
-          <div className="text-xs text-neutral-500 mt-auto">
-            {formData.branch} • Sem {formData.semester} • {formData.srn || 'SRN'}
+        <div className="reg-layout">
+          <form className="form" onSubmit={handleSubmit}>
+            <label>Full Name
+              <input required value={form.name} onChange={set('name')} placeholder="Your name" />
+            </label>
+
+            <div className="two">
+              <label>Domain
+                <select value={form.domain} onChange={set('domain')}>
+                  {DOMAINS.map((d) => <option key={d}>{d}</option>)}
+                </select>
+              </label>
+              <label>Position
+                <select value={form.position} onChange={set('position')}>
+                  {POSITIONS.map((p) => <option key={p}>{p}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <label>SRN
+              <input required value={form.srn} onChange={set('srn')} placeholder="PES1UG23CS001"
+                pattern="PES[0-9][A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{3}" title="Format: PES1UG23CS001" />
+            </label>
+
+            <label>Email
+              <input required type="email" value={form.email} onChange={set('email')} placeholder="you@pes.edu" />
+            </label>
+
+            <label>LinkedIn URL
+              <input type="url" value={form.linkedin_url} onChange={set('linkedin_url')} placeholder="https://linkedin.com/in/..." />
+            </label>
+
+            <label>GitHub URL
+              <input type="url" value={form.github_url} onChange={set('github_url')} placeholder="https://github.com/..." />
+            </label>
+
+            <div className="two">
+              <label>Branch
+                <select value={form.branch} onChange={set('branch')}>
+                  {BRANCHES.map((b) => <option key={b}>{b}</option>)}
+                </select>
+              </label>
+              <label>Semester
+                <select value={form.semester} onChange={set('semester')}>
+                  {SEMESTERS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <label>Short Bio
+              <textarea required rows={4} maxLength={200} value={form.bio} onChange={set('bio')}
+                placeholder="150 to 200 characters about you" />
+              <span className={bioOk ? 'count ok' : 'count'}>{bioLen}/200 (min 150)</span>
+            </label>
+
+            <label>Profile Picture
+              <input type="file" accept="image/png,image/jpeg" onChange={onFile} />
+            </label>
+
+            <button className="btn" type="submit" disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit for approval'}
+            </button>
+          </form>
+
+          <div className="preview">
+            <p className="muted" style={{ marginBottom: 12 }}>Live preview</p>
+            <div className="card">
+              <div className="row">
+                {preview ? (
+                  <img className="avatar" src={preview} alt="preview" />
+                ) : (
+                  <div className="avatar placeholder">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="#71717a">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z" />
+                    </svg>
+                  </div>
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <h2 className="name">{form.name || 'Your Name'}</h2>
+                  <p className="sub">{form.position} · {form.domain}</p>
+                </div>
+              </div>
+              <p className="bio">{form.bio || 'Your short bio will appear here.'}</p>
+              <p className="meta">{form.branch} · Sem {form.semester}</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
