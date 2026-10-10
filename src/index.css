@@ -131,3 +131,4 @@ body::after  { background: #0ea5e9; bottom: -140px; right: -100px; animation-del
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+.card:hover .bio { -webkit-line-clamp: unset; display: block; }
