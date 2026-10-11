@@ -104,7 +104,7 @@ export default function Register() {
 }
 
       const { error: insErr } = await supabase.from('members').insert({
-        ...form, srn, name: form.name.trim(), photo_url: pub.publicUrl, status: 'pending',
+        ...form, srn, name: form.name.trim(), photo_url: photoUrl, status: 'pending',
       })
       if (insErr) throw insErr
 
