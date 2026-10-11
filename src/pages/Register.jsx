@@ -74,7 +74,7 @@ export default function Register() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!photoBlob) return toast.error('Please upload a profile picture')
+    
     if (form.bio.length < 150 || form.bio.length > 200)
       return toast.error('Bio must be 150 to 200 characters')
 
@@ -92,12 +92,16 @@ export default function Register() {
       }
 
       // Upload the WebP only now, on submit
-      const path = `${crypto.randomUUID()}.webp`
-      const { error: upErr } = await supabase.storage
-        .from('member-photos')
-        .upload(path, photoBlob, { contentType: 'image/webp' })
-      if (upErr) throw upErr
-      const { data: pub } = supabase.storage.from('member-photos').getPublicUrl(path)
+      let photoUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(form.name.trim() || srn)}`
+
+      if (photoBlob) {
+  const path = `${crypto.randomUUID()}.webp`
+  const { error: upErr } = await supabase.storage
+    .from('member-photos')
+    .upload(path, photoBlob, { contentType: 'image/webp' })
+  if (upErr) throw upErr
+  photoUrl = supabase.storage.from('member-photos').getPublicUrl(path).data.publicUrl
+}
 
       const { error: insErr } = await supabase.from('members').insert({
         ...form, srn, name: form.name.trim(), photo_url: pub.publicUrl, status: 'pending',
