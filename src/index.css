@@ -137,3 +137,34 @@ body::after  { background: #0ea5e9; bottom: -140px; right: -100px; animation-del
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 .card:hover .bio { -webkit-line-clamp: unset; display: block; }
+/* Cursor spotlight */
+html::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(350px circle at var(--mx, 50%) var(--my, 50%), rgba(139, 92, 246, .12), transparent 70%);
+}
+
+/* 3D tilt cards (replaces the earlier card hover) */
+.card {
+  animation: fadeUp .6s ease backwards;
+  transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform .12s ease-out, box-shadow .25s ease, border-color .25s ease;
+  will-change: transform;
+}
+.card:hover {
+  transform: perspective(800px) translateY(-6px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+
+/* Shine sweep on buttons */
+.btn { position: relative; overflow: hidden; }
+.btn::after {
+  content: ""; position: absolute; top: 0; left: -75%; width: 50%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, .35), transparent);
+  transform: skewX(-20deg);
+}
+.btn:hover::after { left: 130%; transition: left .6s ease; }
+
+/* Mute button */
+.mute {
+  margin-left: auto; background: #18181b; border: 1px solid #27272a;
+  border-radius: 8px; padding: 4px 10px; cursor: pointer;
+}

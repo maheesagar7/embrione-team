@@ -4,7 +4,19 @@ import { supabase } from '../lib/supabase'
 
 const ADMIN_EMAIL = 'admin@embrione.pes.edu'
 const ADMIN_PASSWORD = 'EmbrioneAdmin@2026'
-
+function CountUp({ to }) {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    let f = 0
+    const id = setInterval(() => {
+      f++
+      setN(Math.round(to * Math.min(f / 20, 1)))
+      if (f >= 20) clearInterval(id)
+    }, 25)
+    return () => clearInterval(id)
+  }, [to])
+  return <>{n}</>
+}
 export default function Admin() {
   const [authed, setAuthed] = useState(sessionStorage.getItem('admin') === '1')
   const [email, setEmail] = useState('')
