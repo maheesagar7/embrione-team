@@ -1,24 +1,52 @@
-let ctx
+let ctx = null
 let unlocked = false
 let muted = localStorage.getItem('muted') === '1'
 
-window.addEventListener('pointerdown', () => { unlocked = true }, { once: true })
+// Helper to initialize and unlock the audio context safely
+async function getAudioContext() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)()
+  }
+  if (ctx.state === 'suspended') {
+    await ctx.resume()
+  }
+  return ctx
+}
 
-function tone(freq, dur = 0.12, type = 'sine', vol = 0.06, delay = 0, slideTo) {
+// Unlock audio on the very first user interaction
+window.addEventListener('pointerdown', async () => {
+  unlocked = true
+  try {
+    await getAudioContext()
+  } catch (err) {
+    console.error('Could not unlock audio:', err)
+  }
+}, { once: true }) // Can be once: true since it only needs to unlock once
+
+async function tone(freq, dur = 0.12, type = 'sine', vol = 0.06, delay = 0, slideTo) {
   if (muted || !unlocked) return
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)()
-  if (ctx.state === 'suspended') ctx.resume()
-  const o = ctx.createOscillator()
-  const g = ctx.createGain()
-  const t = ctx.currentTime + delay
-  o.type = type
-  o.frequency.setValueAtTime(freq, t)
-  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur)
-  g.gain.setValueAtTime(vol, t)
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  o.connect(g).connect(ctx.destination)
-  o.start(t)
-  o.stop(t + dur)
+
+  try {
+    const audioCtx = await getAudioContext()
+    if (audioCtx.state !== 'running') return // Prevent playing if context failed to resume
+
+    const o = audioCtx.createOscillator()
+    const g = audioCtx.createGain()
+    const t = audioCtx.currentTime + delay
+    
+    o.type = type
+    o.frequency.setValueAtTime(freq, t)
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur)
+    
+    g.gain.setValueAtTime(vol, t)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    
+    o.connect(g).connect(audioCtx.destination)
+    o.start(t)
+    o.stop(t + dur)
+  } catch (err) {
+    console.error('Error playing tone:', err)
+  }
 }
 
 export const sfx = {
